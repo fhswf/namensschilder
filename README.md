@@ -6,7 +6,8 @@ Namensschilder pro Seite; jedes Schild steht zweimal nebeneinander und ist
 103,5 × 74 mm groß.
 
 ```sh
-python3 namensschilder.py Anmeldungen.csv -o namensschilder.pdf \
+uv sync
+uv run namensschilder Anmeldungen.csv -o namensschilder.pdf \
   --qr-text 'WIFI:T:WPA;S:Mein-Gastnetz;P:Mein-Passwort;;'
 ```
 
@@ -25,8 +26,9 @@ in der CSV in Anführungszeichen stehen.
 
 Voraussetzungen:
 
+- [uv](https://docs.astral.sh/uv/)
 - Apache FOP im PATH (`fop`)
-- Python 3
+- Python 3.10 oder neuer (wird von uv verwaltet)
 - `libqrencode4` für den QR-Code; mit `--no-qr` kann der QR-Code ausgeblendet
   werden
 
@@ -34,7 +36,7 @@ Für die Kontrolle oder Weiterverarbeitung kann zusätzlich die FO-Datei samt
 den erzeugten Hilfsdateien behalten werden:
 
 ```sh
-python3 namensschilder.py Anmeldungen.csv -o namensschilder.pdf \
+uv run namensschilder Anmeldungen.csv -o namensschilder.pdf \
   --fo namensschilder.fo
 ```
 

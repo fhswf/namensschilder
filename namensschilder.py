@@ -7,17 +7,17 @@ Anmeldungen, erzeugt daraus XSL-FO und ruft anschließend FOP auf.
 
 from __future__ import annotations
 
-import argparse
 import csv
 import ctypes
 import ctypes.util
 import html
 import re
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
-from typing import Iterable
+from types import SimpleNamespace
+
+import typer
 
 
 PAGE_WIDTH_MM = 210
@@ -255,17 +255,17 @@ def table_xml(
     rows: list[dict[str, str]],
     assets: dict[str, Path],
     qr_paths: list[Path],
-    args: argparse.Namespace,
+    options: SimpleNamespace,
     row_offset: int,
 ) -> str:
     table_rows = []
     for index, row in enumerate(rows):
-        qr_path = qr_paths[row_offset + index] if not args.no_qr else None
+        qr_path = qr_paths[row_offset + index] if not options.no_qr else None
         table_rows.append(
             f"""
             <fo:table-row height="{CARD_HEIGHT_MM}mm">
-              {badge_xml(row, assets, qr_path, args.qr_label, False, not args.no_qr)}
-              {badge_xml(row, assets, qr_path, args.qr_label, not args.no_rotate_back, not args.no_qr)}
+              {badge_xml(row, assets, qr_path, options.qr_label, False, not options.no_qr)}
+              {badge_xml(row, assets, qr_path, options.qr_label, not options.no_rotate_back, not options.no_qr)}
             </fo:table-row>"""
         )
     return f"""
@@ -281,14 +281,14 @@ def make_fo(
     rows: list[dict[str, str]],
     assets: dict[str, Path],
     qr_paths: list[Path],
-    args: argparse.Namespace,
+    options: SimpleNamespace,
 ) -> str:
     pages = [rows[start : start + CARDS_PER_PAGE] for start in range(0, len(rows), CARDS_PER_PAGE)]
     tables = []
     for index, page_rows in enumerate(pages):
         end = " page-break-after=\"always\"" if index < len(pages) - 1 else ""
         row_offset = index * CARDS_PER_PAGE
-        tables.append(f"<fo:block{end}>{table_xml(page_rows, assets, qr_paths, args, row_offset)}</fo:block>")
+        tables.append(f"<fo:block{end}>{table_xml(page_rows, assets, qr_paths, options, row_offset)}</fo:block>")
 
     return f'''<?xml version="1.0" encoding="UTF-8"?>
 <fo:root xmlns:fo="http://www.w3.org/1999/XSL/Format"
@@ -352,38 +352,46 @@ def run_fop(fop: str, config: Path, fo: Path, pdf: Path) -> None:
         raise RuntimeError(f"Apache FOP ist mit Status {completed.returncode} fehlgeschlagen:\n{details}")
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("csv", type=Path, help="CSV-Datei mit den Anmeldungen")
-    parser.add_argument("-o", "--output", type=Path, default=Path("namensschilder.pdf"), help="Ziel-PDF")
-    parser.add_argument("--fo", type=Path, help="zusätzlich erzeugte XSL-FO-Datei behalten")
-    parser.add_argument("--fop", default="fop", help="FOP-Kommando oder Pfad (Standard: fop)")
-    parser.add_argument(
+app = typer.Typer(add_completion=False, no_args_is_help=True, help=__doc__)
+
+
+@app.command()
+def generate(
+    csv: Path = typer.Argument(..., help="CSV-Datei mit den Anmeldungen"),
+    output: Path = typer.Option(Path("namensschilder.pdf"), "--output", "-o", help="Ziel-PDF"),
+    fo: Path | None = typer.Option(None, "--fo", help="zusätzlich erzeugte XSL-FO-Datei behalten"),
+    fop: str = typer.Option("fop", "--fop", help="FOP-Kommando oder Pfad (Standard: fop)"),
+    qr_text: str = typer.Option(
+        "Gastzugang WLAN",
         "--qr-text",
-        default="Gastzugang WLAN",
-        help="Fallback-Text für den QR-Code ohne QR-Text-Spalte (Standard: %(default)s)",
-    )
-    parser.add_argument("--qr-label", default="Gastzugang WLAN", help="Beschriftung unter dem QR-Code")
-    parser.add_argument("--no-qr", action="store_true", help="QR-Code und QR-Beschriftung ausblenden")
-    parser.add_argument(
+        help="Fallback-Text für den QR-Code ohne QR-Text-Spalte",
+    ),
+    qr_label: str = typer.Option("Gastzugang WLAN", "--qr-label", help="Beschriftung unter dem QR-Code"),
+    no_qr: bool = typer.Option(False, "--no-qr", help="QR-Code und QR-Beschriftung ausblenden"),
+    no_rotate_back: bool = typer.Option(
+        False,
         "--no-rotate-back",
-        action="store_true",
         help="zweite Schildhälfte nicht um 180 Grad drehen (Ansicht wie im Beispielbild)",
+    ),
+) -> None:
+    options = SimpleNamespace(
+        fo=fo,
+        fop=fop,
+        no_qr=no_qr,
+        no_rotate_back=no_rotate_back,
+        output=output,
+        qr_label=qr_label,
+        qr_text=qr_text,
     )
-    return parser
-
-
-def main(argv: Iterable[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
     source_dir = Path(__file__).resolve().parent
     try:
-        rows = read_registrations(args.csv)
+        rows = read_registrations(csv)
         if not rows:
             raise ValueError("Die CSV-Datei enthält keine Anmeldungen.")
 
-        keep_assets = args.fo is not None
+        keep_assets = options.fo is not None
         if keep_assets:
-            assets_dir = args.fo.resolve().parent / f"{args.fo.stem}-assets"
+            assets_dir = options.fo.resolve().parent / f"{options.fo.stem}-assets"
             context = None
         else:
             context = tempfile.TemporaryDirectory(prefix="namensschilder-")
@@ -391,28 +399,31 @@ def main(argv: Iterable[str] | None = None) -> int:
 
         try:
             assets = prepare_assets(source_dir, assets_dir)
-            qr_paths = prepare_qr_assets(rows, assets_dir, args.qr_text, not args.no_qr)
-            fo_content = make_fo(rows, assets, qr_paths, args)
-            fo_path = args.fo.resolve() if args.fo else assets_dir / "namensschilder.fo"
+            qr_paths = prepare_qr_assets(rows, assets_dir, options.qr_text, not options.no_qr)
+            fo_content = make_fo(rows, assets, qr_paths, options)
+            fo_path = options.fo.resolve() if options.fo else assets_dir / "namensschilder.fo"
             fo_path.parent.mkdir(parents=True, exist_ok=True)
             fo_path.write_text(fo_content, encoding="utf-8")
             config = assets_dir / "fop-config.xml"
             make_fop_config(config)
-            run_fop(args.fop, config, fo_path, args.output.resolve())
+            run_fop(options.fop, config, fo_path, options.output.resolve())
         finally:
             if context is not None:
                 context.cleanup()
     except (OSError, ValueError, RuntimeError) as error:
-        print(f"Fehler: {error}", file=sys.stderr)
-        return 1
+        typer.echo(f"Fehler: {error}", err=True)
+        raise typer.Exit(code=1) from error
 
     pages = (len(rows) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE
-    print(f"{len(rows)} Namensschilder auf {pages} A4-Seite(n): {args.output}")
-    if args.fo:
-        assets_path = args.fo.resolve().parent / f"{args.fo.stem}-assets"
-        print(f"FO-Datei und verwendete SVG-Hilfsdateien: {args.fo} und {assets_path}/")
-    return 0
+    typer.echo(f"{len(rows)} Namensschilder auf {pages} A4-Seite(n): {options.output}")
+    if options.fo:
+        assets_path = options.fo.resolve().parent / f"{options.fo.stem}-assets"
+        typer.echo(f"FO-Datei und verwendete SVG-Hilfsdateien: {options.fo} und {assets_path}/")
+
+
+def main() -> None:
+    app()
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()

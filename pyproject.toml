@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "namensschilder"
+version = "0.1.0"
+description = "Erzeugt A4-Druckvorlagen für gefaltete Namensschilder"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "typer>=0.16,<1",
+]
+
+[project.scripts]
+namensschilder = "namensschilder:main"
+
+[tool.hatch.build.targets.wheel]
+include = [
+    "namensschilder.py",
+    "README.md",
+    "assets/*.svg",
+    "fonts/*.ttf",
+    "fonts/OFL.txt",
+]

@@ -11,6 +11,7 @@ import csv
 import ctypes
 import ctypes.util
 import html
+import json
 import re
 import subprocess
 import tempfile
@@ -166,6 +167,19 @@ def make_rounded_line_svg(destination: Path) -> None:
     )
 
 
+def parse_logo_paths(value: str | None) -> list[Path] | None:
+    """Parse the JSON array used by the GitHub Action and CLI."""
+    if value is None:
+        return None
+    try:
+        paths = json.loads(value)
+    except json.JSONDecodeError as error:
+        raise ValueError("--logos erwartet ein JSON-Array von Pfaden.") from error
+    if not isinstance(paths, list) or not all(isinstance(path, str) for path in paths):
+        raise ValueError("--logos erwartet ein JSON-Array von Pfaden.")
+    return [Path(path) for path in paths]
+
+
 def make_fop_config(destination: Path) -> None:
     font_dirs = [
         Path(__file__).resolve().parent / "fonts",
@@ -199,6 +213,7 @@ def font_size_for_name(name: str) -> str:
 def badge_xml(
     row: dict[str, str],
     assets: dict[str, Path],
+    logo_paths: list[Path],
     qr_path: Path | None,
     qr_label: str,
     rotate: bool,
@@ -255,16 +270,40 @@ def badge_xml(
           <fo:block font-family="Fira Sans" font-size="8.5pt" font-weight="bold" color="#000000" line-height="1.05">{xml(company)}</fo:block>
         </fo:block-container>"""
 
+    logo_blocks = []
+    if len(logo_paths) == 1:
+        logo_blocks.append(
+            f"""<fo:block-container position="absolute" left="{CARD_MARGIN_MM}mm" top="3mm" width="{VDI_LOGO_WIDTH_MM}mm" height="{LOGO_HEIGHT_MM}mm">
+          <fo:block font-size="0pt"><fo:external-graphic src="url('{file_url(logo_paths[0])}')" content-width="{VDI_LOGO_WIDTH_MM}mm" content-height="{LOGO_HEIGHT_MM}mm" scaling="non-uniform"/></fo:block>
+        </fo:block-container>"""
+        )
+    elif len(logo_paths) == 2:
+        logo_blocks.extend(
+            [
+                f"""<fo:block-container position="absolute" left="{CARD_MARGIN_MM}mm" top="3mm" width="{VDI_LOGO_WIDTH_MM}mm" height="{LOGO_HEIGHT_MM}mm">
+          <fo:block font-size="0pt"><fo:external-graphic src="url('{file_url(logo_paths[0])}')" content-width="{VDI_LOGO_WIDTH_MM}mm" content-height="{LOGO_HEIGHT_MM}mm" scaling="non-uniform"/></fo:block>
+        </fo:block-container>""",
+                f"""<fo:block-container position="absolute" right="{CARD_MARGIN_MM}mm" top="3mm" width="{FH_LOGO_WIDTH_MM}mm" height="{LOGO_HEIGHT_MM}mm">
+          <fo:block font-size="0pt"><fo:external-graphic src="url('{file_url(logo_paths[1])}')" content-width="{FH_LOGO_WIDTH_MM}mm" content-height="{LOGO_HEIGHT_MM}mm" scaling="non-uniform"/></fo:block>
+        </fo:block-container>""",
+            ]
+        )
+    elif logo_paths:
+        gap = 3
+        width = (CARD_WIDTH_MM - 2 * CARD_MARGIN_MM - gap * (len(logo_paths) - 1)) / len(logo_paths)
+        for index, logo_path in enumerate(logo_paths):
+            left = CARD_MARGIN_MM + index * (width + gap)
+            logo_blocks.append(
+                f"""<fo:block-container position="absolute" left="{left:.2f}mm" top="3mm" width="{width:.2f}mm" height="{LOGO_HEIGHT_MM}mm">
+          <fo:block font-size="0pt"><fo:external-graphic src="url('{file_url(logo_path)}')" content-width="{width:.2f}mm" content-height="{LOGO_HEIGHT_MM}mm" scaling="uniform"/></fo:block>
+        </fo:block-container>"""
+            )
+
     return f"""
     <fo:table-cell padding="0mm" margin="0mm" width="{CARD_WIDTH_MM}mm" height="{CARD_HEIGHT_MM}mm"
                    border="0.2pt solid #bcbcbc" keep-together.within-page="always">
       <fo:block-container padding="0mm" margin="0mm" width="{CARD_WIDTH_MM}mm" height="{CARD_HEIGHT_MM}mm" overflow="hidden"{rotation}>
-        <fo:block-container position="absolute" left="{CARD_MARGIN_MM}mm" top="3mm" width="{VDI_LOGO_WIDTH_MM}mm" height="{LOGO_HEIGHT_MM}mm">
-          <fo:block font-size="0pt"><fo:external-graphic src="url('{file_url(assets['vdi'])}')" content-width="{VDI_LOGO_WIDTH_MM}mm" content-height="{LOGO_HEIGHT_MM}mm" scaling="non-uniform"/></fo:block>
-        </fo:block-container>
-        <fo:block-container position="absolute" right="{CARD_MARGIN_MM}mm" top="3mm" width="{FH_LOGO_WIDTH_MM}mm" height="{LOGO_HEIGHT_MM}mm">
-          <fo:block font-size="0pt"><fo:external-graphic src="url('{file_url(assets['fh'])}')" content-width="{FH_LOGO_WIDTH_MM}mm" content-height="{LOGO_HEIGHT_MM}mm" scaling="non-uniform"/></fo:block>
-        </fo:block-container>
+        {''.join(logo_blocks)}
         {name_area}
         {qr}
         <fo:block-container padding="0mm" margin="0mm" position="absolute" left="0mm" bottom="0mm" width="{BANNER_WIDTH_MM}mm" height="{BANNER_HEIGHT_MM}mm"><fo:block><fo:external-graphic src="url('{file_url(assets['banner'])}')" content-width="{BANNER_WIDTH_MM}mm" content-height="{BANNER_HEIGHT_MM}mm" scaling="non-uniform"/></fo:block></fo:block-container>
@@ -275,6 +314,7 @@ def badge_xml(
 def table_xml(
     rows: list[dict[str, str]],
     assets: dict[str, Path],
+    logo_paths: list[Path],
     qr_paths: list[Path | None],
     options: SimpleNamespace,
     row_offset: int,
@@ -286,8 +326,8 @@ def table_xml(
         table_rows.append(
             f"""
             <fo:table-row height="{CARD_HEIGHT_MM}mm">
-              {badge_xml(row, assets, qr_path, options.qr_label, False, show_qr)}
-              {badge_xml(row, assets, qr_path, options.qr_label, not options.no_rotate_back, show_qr)}
+              {badge_xml(row, assets, logo_paths, qr_path, options.qr_label, False, show_qr)}
+              {badge_xml(row, assets, logo_paths, qr_path, options.qr_label, not options.no_rotate_back, show_qr)}
             </fo:table-row>"""
         )
     return f"""
@@ -302,6 +342,7 @@ def table_xml(
 def make_fo(
     rows: list[dict[str, str]],
     assets: dict[str, Path],
+    logo_paths: list[Path],
     qr_paths: list[Path | None],
     options: SimpleNamespace,
 ) -> str:
@@ -310,7 +351,7 @@ def make_fo(
     for index, page_rows in enumerate(pages):
         end = " page-break-after=\"always\"" if index < len(pages) - 1 else ""
         row_offset = index * CARDS_PER_PAGE
-        tables.append(f"<fo:block{end}>{table_xml(page_rows, assets, qr_paths, options, row_offset)}</fo:block>")
+        tables.append(f"<fo:block{end}>{table_xml(page_rows, assets, logo_paths, qr_paths, options, row_offset)}</fo:block>")
 
     return f'''<?xml version="1.0" encoding="UTF-8"?>
 <fo:root xmlns:fo="http://www.w3.org/1999/XSL/Format"
@@ -329,15 +370,25 @@ def make_fo(
 '''
 
 
-def prepare_assets(source_dir: Path, assets_dir: Path) -> dict[str, Path]:
+def prepare_assets(
+    source_dir: Path,
+    assets_dir: Path,
+    banner_path: Path | None,
+    logo_paths: list[Path] | None,
+) -> tuple[dict[str, Path], list[Path]]:
     assets_dir.mkdir(parents=True, exist_ok=True)
     source_assets_dir = source_dir / "assets"
-    banner = source_assets_dir / "Bild.svg"
-    vdi = source_assets_dir / "VDI_Logo_2022.svg"
-    fh = source_assets_dir / "FH-SWF Logo-CMYK.svg"
+    banner = banner_path or source_assets_dir / "Bild.svg"
+    logos = logo_paths if logo_paths is not None else [
+        source_assets_dir / "VDI_Logo_2022.svg",
+        source_assets_dir / "FH-SWF Logo-CMYK.svg",
+    ]
+    for asset in [banner, *logos]:
+        if not asset.is_file():
+            raise ValueError(f"Asset-Datei nicht gefunden: {asset}")
     rounded_line = assets_dir / "rounded-line.svg"
     make_rounded_line_svg(rounded_line)
-    return {"banner": banner, "vdi": vdi, "fh": fh, "rounded_line": rounded_line}
+    return {"banner": banner, "rounded_line": rounded_line}, logos
 
 
 def prepare_qr_assets(
@@ -384,6 +435,8 @@ app = typer.Typer(add_completion=False, no_args_is_help=True, help=__doc__)
 def generate(
     csv: Path = typer.Argument(..., help="CSV-Datei mit den Anmeldungen"),
     output: Path = typer.Option(Path("namensschilder.pdf"), "--output", "-o", help="Ziel-PDF"),
+    banner: Path | None = typer.Option(None, "--banner", help="SVG-Datei für den Banner"),
+    logos: str | None = typer.Option(None, "--logos", help="JSON-Array mit SVG-Dateien für die Logos"),
     fo: Path | None = typer.Option(None, "--fo", help="zusätzlich erzeugte XSL-FO-Datei behalten"),
     fop: str = typer.Option("fop", "--fop", help="FOP-Kommando oder Pfad (Standard: fop)"),
     qr_text: str | None = typer.Option(
@@ -407,9 +460,12 @@ def generate(
         output=output,
         qr_label=qr_label,
         qr_text=qr_text,
+        banner=banner,
+        logo_paths=None,
     )
     source_dir = Path(__file__).resolve().parent
     try:
+        options.logo_paths = parse_logo_paths(logos)
         rows = read_registrations(csv)
         if not rows:
             raise ValueError("Die CSV-Datei enthält keine Anmeldungen.")
@@ -423,9 +479,9 @@ def generate(
             assets_dir = Path(context.name)
 
         try:
-            assets = prepare_assets(source_dir, assets_dir)
+            assets, logo_paths = prepare_assets(source_dir, assets_dir, options.banner, options.logo_paths)
             qr_paths = prepare_qr_assets(rows, assets_dir, options.qr_text, not options.no_qr)
-            fo_content = make_fo(rows, assets, qr_paths, options)
+            fo_content = make_fo(rows, assets, logo_paths, qr_paths, options)
             fo_path = options.fo.resolve() if options.fo else assets_dir / "namensschilder.fo"
             fo_path.parent.mkdir(parents=True, exist_ok=True)
             fo_path.write_text(fo_content, encoding="utf-8")

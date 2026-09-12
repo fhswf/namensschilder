@@ -1,0 +1,110 @@
+name: Namensschilder als PDF
+description: Erzeugt eine A4-PDF-Druckvorlage für gefaltete Namensschilder aus einer CSV-Datei.
+author: Christian Gawron
+
+branding:
+  icon: tag
+  color: purple
+
+inputs:
+  csv:
+    description: Pfad zur semikolongetrennten CSV-Datei im aufrufenden Repository.
+    required: true
+  banner:
+    description: Pfad zur Banner-SVG-Datei im aufrufenden Repository.
+    required: true
+  logos:
+    description: JSON-Array mit Pfaden zu den Logo-SVG-Dateien im aufrufenden Repository.
+    required: true
+  output:
+    description: Pfad der erzeugten PDF-Datei, relativ zum Workspace.
+    required: false
+    default: namensschilder.pdf
+  qr-text:
+    description: Globaler Fallback-Text für QR-Codes, wenn die CSV keine QR-Text-Spalte enthält.
+    required: false
+  qr-label:
+    description: Beschriftung unter dem QR-Code.
+    required: false
+    default: Gastzugang WLAN
+  no-qr:
+    description: QR-Code und QR-Beschriftung ausblenden.
+    required: false
+    default: "false"
+  no-rotate-back:
+    description: Die zweite Schildhälfte nicht um 180 Grad drehen.
+    required: false
+    default: "false"
+  fo:
+    description: Optionaler Pfad, unter dem zusätzlich die XSL-FO-Datei gespeichert wird.
+    required: false
+
+outputs:
+  pdf:
+    description: Absoluter Pfad zur erzeugten PDF-Datei.
+    value: ${{ steps.generate.outputs.pdf }}
+
+runs:
+  using: composite
+  steps:
+    - name: Systemabhängigkeiten installieren
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        if [[ "$(uname -s)" != "Linux" ]]; then
+          echo "Diese Action benötigt einen Linux-Runner mit apt-get (z. B. ubuntu-latest)." >&2
+          exit 1
+        fi
+
+        if ! command -v fop >/dev/null 2>&1 || ! ldconfig -p 2>/dev/null | grep -q 'libqrencode\.so'; then
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y fop libqrencode4
+        fi
+
+    - name: Python-Abhängigkeiten installieren
+      id: python
+      shell: bash
+      env:
+        RUNNER_TEMP: ${{ runner.temp }}
+      run: |
+        set -euo pipefail
+        venv="$RUNNER_TEMP/namensschilder-venv"
+        python3 -m venv "$venv"
+        "$venv/bin/python" -m pip install --disable-pip-version-check --quiet 'typer>=0.16,<1'
+        echo "python=$venv/bin/python" >> "$GITHUB_OUTPUT"
+
+    - name: PDF erzeugen
+      id: generate
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        NS_CSV: ${{ inputs.csv }}
+        NS_BANNER: ${{ inputs.banner }}
+        NS_LOGOS: ${{ inputs.logos }}
+        NS_OUTPUT: ${{ inputs.output }}
+        NS_QR_TEXT: ${{ inputs.qr-text }}
+        NS_QR_LABEL: ${{ inputs.qr-label }}
+        NS_NO_QR: ${{ inputs.no-qr }}
+        NS_NO_ROTATE_BACK: ${{ inputs.no-rotate-back }}
+        NS_FO: ${{ inputs.fo }}
+        NS_PYTHON: ${{ steps.python.outputs.python }}
+      run: |
+        set -euo pipefail
+
+        args=("$NS_CSV" --banner "$NS_BANNER" --logos "$NS_LOGOS" --output "$NS_OUTPUT" --qr-label "$NS_QR_LABEL")
+        if [[ -n "$NS_QR_TEXT" ]]; then
+          args+=(--qr-text "$NS_QR_TEXT")
+        fi
+        if [[ "$NS_NO_QR" == "true" ]]; then
+          args+=(--no-qr)
+        fi
+        if [[ "$NS_NO_ROTATE_BACK" == "true" ]]; then
+          args+=(--no-rotate-back)
+        fi
+        if [[ -n "$NS_FO" ]]; then
+          args+=(--fo "$NS_FO")
+        fi
+
+        "$NS_PYTHON" "$GITHUB_ACTION_PATH/namensschilder.py" "${args[@]}"
+        echo "pdf=$(realpath "$NS_OUTPUT")" >> "$GITHUB_OUTPUT"

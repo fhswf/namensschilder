@@ -1,0 +1,7 @@
+.git
+.github
+*.csv
+*.pdf
+__pycache__
+dist
+.venv

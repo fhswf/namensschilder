@@ -59,9 +59,11 @@ uv run namensschilder Anmeldungen.csv -o namensschilder.pdf \
 
 ## Verwendung als GitHub Action
 
-Die Action kann in einem anderen Repository verwendet werden. Der Runner muss
-Linux verwenden, zum Beispiel `ubuntu-latest`; FOP, `libqrencode` und die
-Python-Abhängigkeit werden von der Action eingerichtet.
+Die Action kann in einem anderen Repository verwendet werden. Sie läuft als
+Docker-Container-Action auf einem Linux-Runner, zum Beispiel
+`ubuntu-latest`. Das vorgebaute Image enthält FOP, `libqrencode`, die
+Python-Abhängigkeit und die mitgelieferten Standard-Assets und wird nur noch
+aus GHCR gepullt.
 
 ```yaml
 name: Namensschilder
@@ -80,7 +82,7 @@ jobs:
 
       - name: Namensschilder erzeugen
         id: namensschilder
-        uses: cgawron/namensschilder@main
+        uses: cgawron/namensschilder@v1
         with:
           csv: data/anmeldungen.csv
           banner: branding/banner.svg
@@ -100,3 +102,16 @@ der erste links und der zweite rechts platziert. Zusätzlich stehen `qr-text`,
 `qr-label`, `no-qr`, `no-rotate-back` und `fo` als Inputs zur Verfügung.
 Enthält die CSV die Spalte `QR-Text`, wird deren Wert pro Zeile verwendet;
 `qr-text` dient dann nicht als Fallback.
+
+`runs-on` bezeichnet weiterhin den GitHub-Runner und nicht das Container-Image.
+Für die Verwendung des vorgebauten Images muss zunächst das Release-Tag `v1`
+angelegt und das Paket `ghcr.io/cgawron/namensschilder` öffentlich gemacht
+werden. Der Workflow
+`.github/workflows/publish-image.yml` veröffentlicht bei jedem `v*`-Tag das
+passende Image. Für spätere Releases sollten Action-Tag und Image-Tag gemeinsam
+aktualisiert werden.
+
+Ein Dockerfile-basierter Action-Aufruf (`image: Dockerfile`) würde das Image
+auf einem frischen Runner erst bauen. Das vorliegende Setup vermeidet diesen
+Build im aufrufenden Workflow und lädt stattdessen das bereits veröffentlichte
+Image.

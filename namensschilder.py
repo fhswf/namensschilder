@@ -203,8 +203,10 @@ def badge_xml(
     show_qr: bool,
 ) -> str:
     title = row.get("Titel", "")
+    speaker = row.get("Speaker", "")
     name = " ".join(part for part in (row.get("Vorname", ""), row.get("Name", "")) if part)
     company = row.get("Institution / Unternehmen", "")
+    title_content = xml(title) or "&#160;"
     name_size = font_size_for_name(name)
     rotation = ' fox:transform="rotate(180)"' if rotate else ""
 
@@ -220,6 +222,21 @@ def badge_xml(
           <fo:block><fo:external-graphic src="url('{file_url(qr_path)}')" content-width="20mm" content-height="20mm" scaling="non-uniform"/></fo:block>
         </fo:block-container>"""
 
+    speaker_block = ""
+    if speaker:
+        speaker_block = f"""
+        <fo:block-container position="absolute" left="{CARD_MARGIN_MM}mm" top="25mm" width="62mm" height="7mm">
+          <fo:block font-family="Fira Sans" font-size="9pt" font-weight="bold" color="{MAGENTA}" text-align="right">{xml(speaker)}</fo:block>
+        </fo:block-container>"""
+
+    name_area = f"""
+        <fo:block-container position="absolute" left="{CARD_MARGIN_MM}mm" top="25mm" width="62mm" height="25mm" overflow="hidden">
+          <fo:block font-family="Fira Sans" font-size="9pt" font-weight="bold" color="{BLUE}" line-height="1.05" end-indent="4mm" space-after="2.7mm">{title_content}</fo:block>
+          <fo:block font-family="Fira Sans" font-size="{name_size}" font-weight="bold" color="{BLUE}" line-height="1.05" space-after="1.1mm">{xml(name)}</fo:block>
+          <fo:block font-size="0pt" line-height="1.2mm" space-after="1.8mm"><fo:external-graphic src="url('{file_url(assets['rounded_line'])}')" content-width="25mm" content-height="1.2mm" scaling="non-uniform"/></fo:block>
+          <fo:block font-family="Fira Sans" font-size="8.5pt" font-weight="bold" color="#000000">{xml(company)}</fo:block>
+        </fo:block-container>"""
+
     return f"""
     <fo:table-cell padding="0mm" margin="0mm" width="{CARD_WIDTH_MM}mm" height="{CARD_HEIGHT_MM}mm"
                    border="0.2pt solid #bcbcbc" keep-together.within-page="always">
@@ -230,18 +247,8 @@ def badge_xml(
         <fo:block-container position="absolute" right="{CARD_MARGIN_MM}mm" top="3mm" width="{FH_LOGO_WIDTH_MM}mm" height="{LOGO_HEIGHT_MM}mm">
           <fo:block font-size="0pt"><fo:external-graphic src="url('{file_url(assets['fh'])}')" content-width="{FH_LOGO_WIDTH_MM}mm" content-height="{LOGO_HEIGHT_MM}mm" scaling="non-uniform"/></fo:block>
         </fo:block-container>
-        <fo:block-container position="absolute" left="{CARD_MARGIN_MM}mm" top="25mm" width="58mm" height="7mm">
-          <fo:block font-family="Fira Sans" font-size="9pt" font-weight="bold" color="{BLUE}">{xml(title)}</fo:block>
-        </fo:block-container>
-        <fo:block-container position="absolute" left="{CARD_MARGIN_MM}mm" top="31mm" width="62mm" height="9mm">
-          <fo:block font-family="Fira Sans" font-size="{name_size}" font-weight="bold" color="{BLUE}" line-height="1.05">{xml(name)}</fo:block>
-        </fo:block-container>
-        <fo:block-container position="absolute" left="{CARD_MARGIN_MM}mm" top="38mm" width="25mm" height="1.2mm">
-          <fo:block font-size="0pt" line-height="1.2mm"><fo:external-graphic src="url('{file_url(assets['rounded_line'])}')" content-width="25mm" content-height="1.2mm" scaling="non-uniform"/></fo:block>
-        </fo:block-container>
-        <fo:block-container position="absolute" left="{CARD_MARGIN_MM}mm" top="41mm" width="62mm" height="7mm">
-          <fo:block font-family="Fira Sans" font-size="8.5pt" font-weight="bold" color="#000000">{xml(company)}</fo:block>
-        </fo:block-container>
+        {speaker_block}
+        {name_area}
         {qr}
         <!-- FOP richtet Inline-Grafiken auf der Grundlinie aus; der Block wird
              deshalb um den zusätzlichen Grundlinienabstand nach oben versetzt.

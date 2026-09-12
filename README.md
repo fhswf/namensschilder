@@ -12,8 +12,11 @@ uv run namensschilder Anmeldungen.csv -o namensschilder.pdf \
 ```
 
 Die CSV ist semikolongetrennt und benötigt die Spalten `Name`, `Vorname`,
-`Titel` und `Institution / Unternehmen`. Die mitgelieferten SVG-Dateien werden
-direkt in die FO-Ausgabe eingebunden. Sie liegen im Verzeichnis `assets/`.
+`Titel` und `Institution / Unternehmen`. Optional können die Spalten `Speaker`
+und `QR-Text` angegeben werden. Ein Eintrag in `Speaker` wird magenta,
+rechtsbündig neben dem Titel und über dem rechten Rand des Namens ausgegeben.
+Die mitgelieferten SVG-Dateien werden direkt in die FO-Ausgabe eingebunden.
+Sie liegen im Verzeichnis `assets/`.
 `Bild.svg` sollte dabei bereits den
 gewünschten Banner-Ausschnitt ohne zusätzlichen Rand enthalten.
 Die verwendeten Fira-Sans-Schnitte liegen zusammen mit ihrer OFL-Lizenz im

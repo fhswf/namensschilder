@@ -28,8 +28,8 @@ CARD_HEIGHT_MM = 74
 CARD_MARGIN_MM = 8
 BANNER_WIDTH_MM = 103.5
 BANNER_HEIGHT_MM = 23.3
-NAME_AREA_TOP_MM = 25
-NAME_AREA_HEIGHT_MM = CARD_HEIGHT_MM - BANNER_HEIGHT_MM - NAME_AREA_TOP_MM
+NAME_AREA_BOTTOM_MM = BANNER_HEIGHT_MM + 5
+NAME_AREA_HEIGHT_MM = CARD_HEIGHT_MM - BANNER_HEIGHT_MM - 24
 
 LOGO_HEIGHT_MM = 10
 VDI_LOGO_WIDTH_MM = 16.02
@@ -208,7 +208,6 @@ def badge_xml(
     speaker = row.get("Speaker", "")
     name = " ".join(part for part in (row.get("Vorname", ""), row.get("Name", "")) if part)
     company = row.get("Institution / Unternehmen", "")
-    title_content = xml(title) or "&#160;"
     name_size = font_size_for_name(name)
     rotation = ' fox:transform="rotate(180)"' if rotate else ""
 
@@ -224,16 +223,33 @@ def badge_xml(
           <fo:block><fo:external-graphic src="url('{file_url(qr_path)}')" content-width="20mm" content-height="20mm" scaling="non-uniform"/></fo:block>
         </fo:block-container>"""
 
-    speaker_block = ""
-    if speaker:
-        speaker_block = f"""
-        <fo:block-container position="absolute" left="{CARD_MARGIN_MM}mm" top="{NAME_AREA_TOP_MM}mm" width="62mm" height="7mm">
-          <fo:block font-family="Fira Sans" font-size="9pt" font-weight="bold" color="{MAGENTA}" text-align="right">{xml(speaker)}</fo:block>
-        </fo:block-container>"""
+    heading = ""
+    if title and speaker:
+        heading = f"""
+          <fo:table table-layout="fixed" width="62mm">
+            <fo:table-column column-width="47mm"/>
+            <fo:table-column column-width="15mm"/>
+            <fo:table-body>
+              <fo:table-row>
+                <fo:table-cell padding="0mm">
+                  <fo:block font-family="Fira Sans" font-size="9pt" font-weight="bold" color="{BLUE}" line-height="1.05">{xml(title)}</fo:block>
+                </fo:table-cell>
+                <fo:table-cell padding="0mm">
+                  <fo:block font-family="Fira Sans" font-size="9pt" font-weight="bold" color="{MAGENTA}" line-height="1.05" text-align="right">{xml(speaker)}</fo:block>
+                </fo:table-cell>
+              </fo:table-row>
+            </fo:table-body>
+          </fo:table>"""
+    elif title:
+        heading = f"""
+          <fo:block font-family="Fira Sans" font-size="9pt" font-weight="bold" color="{BLUE}" line-height="1.05">{xml(title)}</fo:block>"""
+    elif speaker:
+        heading = f"""
+          <fo:block font-family="Fira Sans" font-size="9pt" font-weight="bold" color="{MAGENTA}" line-height="1.05" text-align="right">{xml(speaker)}</fo:block>"""
 
     name_area = f"""
-        <fo:block-container position="absolute" left="{CARD_MARGIN_MM}mm" top="{NAME_AREA_TOP_MM}mm" width="62mm" height="{NAME_AREA_HEIGHT_MM}mm" overflow="hidden">
-          <fo:block font-family="Fira Sans" font-size="9pt" font-weight="bold" color="{BLUE}" line-height="1.05" end-indent="4mm" space-after="2.7mm">{title_content}</fo:block>
+        <fo:block-container position="absolute" left="{CARD_MARGIN_MM}mm" bottom="{NAME_AREA_BOTTOM_MM}mm" width="62mm" height="{NAME_AREA_HEIGHT_MM}mm" overflow="hidden" display-align="after">
+          {heading}
           <fo:block font-family="Fira Sans" font-size="{name_size}" font-weight="bold" color="{BLUE}" line-height="1.05" space-after="1.1mm">{xml(name)}</fo:block>
           <fo:block font-size="0pt" line-height="1.2mm" space-after="1.8mm"><fo:external-graphic src="url('{file_url(assets['rounded_line'])}')" content-width="25mm" content-height="1.2mm" scaling="non-uniform"/></fo:block>
           <fo:block font-family="Fira Sans" font-size="8.5pt" font-weight="bold" color="#000000" line-height="1.05">{xml(company)}</fo:block>
@@ -249,12 +265,8 @@ def badge_xml(
         <fo:block-container position="absolute" right="{CARD_MARGIN_MM}mm" top="3mm" width="{FH_LOGO_WIDTH_MM}mm" height="{LOGO_HEIGHT_MM}mm">
           <fo:block font-size="0pt"><fo:external-graphic src="url('{file_url(assets['fh'])}')" content-width="{FH_LOGO_WIDTH_MM}mm" content-height="{LOGO_HEIGHT_MM}mm" scaling="non-uniform"/></fo:block>
         </fo:block-container>
-        {speaker_block}
         {name_area}
         {qr}
-        <!-- FOP richtet Inline-Grafiken auf der Grundlinie aus; der Block wird
-             deshalb um den zusätzlichen Grundlinienabstand nach oben versetzt.
-             Bild.svg hat außerdem einen schmalen linken Rand im Banner-Motiv. -->
         <fo:block-container padding="0mm" margin="0mm" position="absolute" left="0mm" bottom="0mm" width="{BANNER_WIDTH_MM}mm" height="{BANNER_HEIGHT_MM}mm"><fo:block><fo:external-graphic src="url('{file_url(assets['banner'])}')" content-width="{BANNER_WIDTH_MM}mm" content-height="{BANNER_HEIGHT_MM}mm" scaling="non-uniform"/></fo:block></fo:block-container>
       </fo:block-container>
     </fo:table-cell>"""

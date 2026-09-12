@@ -28,6 +28,8 @@ CARD_HEIGHT_MM = 74
 CARD_MARGIN_MM = 8
 BANNER_WIDTH_MM = 103.5
 BANNER_HEIGHT_MM = 23.3
+NAME_AREA_TOP_MM = 25
+NAME_AREA_HEIGHT_MM = CARD_HEIGHT_MM - BANNER_HEIGHT_MM - NAME_AREA_TOP_MM
 
 LOGO_HEIGHT_MM = 10
 VDI_LOGO_WIDTH_MM = 16.02
@@ -225,16 +227,16 @@ def badge_xml(
     speaker_block = ""
     if speaker:
         speaker_block = f"""
-        <fo:block-container position="absolute" left="{CARD_MARGIN_MM}mm" top="25mm" width="62mm" height="7mm">
+        <fo:block-container position="absolute" left="{CARD_MARGIN_MM}mm" top="{NAME_AREA_TOP_MM}mm" width="62mm" height="7mm">
           <fo:block font-family="Fira Sans" font-size="9pt" font-weight="bold" color="{MAGENTA}" text-align="right">{xml(speaker)}</fo:block>
         </fo:block-container>"""
 
     name_area = f"""
-        <fo:block-container position="absolute" left="{CARD_MARGIN_MM}mm" top="25mm" width="62mm" height="25mm" overflow="hidden">
+        <fo:block-container position="absolute" left="{CARD_MARGIN_MM}mm" top="{NAME_AREA_TOP_MM}mm" width="62mm" height="{NAME_AREA_HEIGHT_MM}mm" overflow="hidden">
           <fo:block font-family="Fira Sans" font-size="9pt" font-weight="bold" color="{BLUE}" line-height="1.05" end-indent="4mm" space-after="2.7mm">{title_content}</fo:block>
           <fo:block font-family="Fira Sans" font-size="{name_size}" font-weight="bold" color="{BLUE}" line-height="1.05" space-after="1.1mm">{xml(name)}</fo:block>
           <fo:block font-size="0pt" line-height="1.2mm" space-after="1.8mm"><fo:external-graphic src="url('{file_url(assets['rounded_line'])}')" content-width="25mm" content-height="1.2mm" scaling="non-uniform"/></fo:block>
-          <fo:block font-family="Fira Sans" font-size="8.5pt" font-weight="bold" color="#000000">{xml(company)}</fo:block>
+          <fo:block font-family="Fira Sans" font-size="8.5pt" font-weight="bold" color="#000000" line-height="1.05">{xml(company)}</fo:block>
         </fo:block-container>"""
 
     return f"""

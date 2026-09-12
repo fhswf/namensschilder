@@ -45,7 +45,7 @@ outputs:
 
 runs:
   using: docker
-  image: docker://ghcr.io/cgawron/namensschilder:v1
+  image: docker://ghcr.io/fhswf/namensschilder:v1
   args:
     - ${{ inputs.csv }}
     - ${{ inputs.banner }}

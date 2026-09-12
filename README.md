@@ -22,10 +22,11 @@ gewünschten Banner-Ausschnitt ohne zusätzlichen Rand enthalten.
 Die verwendeten Fira-Sans-Schnitte liegen zusammen mit ihrer OFL-Lizenz im
 Verzeichnis `fonts/` und werden von FOP automatisch eingebunden.
 
-Enthält die CSV-Datei die optionale Spalte `QR-Text`, wird für jede Zeile ein
-individueller QR-Code aus diesem Feld erzeugt. Fehlt die Spalte, wird der
-globale Wert aus `--qr-text` verwendet. Semikolons im QR-Text müssen wie üblich
-in der CSV in Anführungszeichen stehen.
+Enthält die CSV-Datei die optionale Spalte `QR-Text`, wird für jede Zeile mit
+einem Eintrag ein individueller QR-Code aus diesem Feld erzeugt. Fehlt die
+Spalte, wird der globale Wert aus `--qr-text` verwendet. Ohne QR-Text und ohne
+`--qr-text` wird kein QR-Code ausgegeben. Semikolons im QR-Text müssen wie
+üblich in der CSV in Anführungszeichen stehen.
 
 Voraussetzungen:
 

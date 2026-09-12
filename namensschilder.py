@@ -275,18 +275,19 @@ def badge_xml(
 def table_xml(
     rows: list[dict[str, str]],
     assets: dict[str, Path],
-    qr_paths: list[Path],
+    qr_paths: list[Path | None],
     options: SimpleNamespace,
     row_offset: int,
 ) -> str:
     table_rows = []
     for index, row in enumerate(rows):
         qr_path = qr_paths[row_offset + index] if not options.no_qr else None
+        show_qr = qr_path is not None
         table_rows.append(
             f"""
             <fo:table-row height="{CARD_HEIGHT_MM}mm">
-              {badge_xml(row, assets, qr_path, options.qr_label, False, not options.no_qr)}
-              {badge_xml(row, assets, qr_path, options.qr_label, not options.no_rotate_back, not options.no_qr)}
+              {badge_xml(row, assets, qr_path, options.qr_label, False, show_qr)}
+              {badge_xml(row, assets, qr_path, options.qr_label, not options.no_rotate_back, show_qr)}
             </fo:table-row>"""
         )
     return f"""
@@ -301,7 +302,7 @@ def table_xml(
 def make_fo(
     rows: list[dict[str, str]],
     assets: dict[str, Path],
-    qr_paths: list[Path],
+    qr_paths: list[Path | None],
     options: SimpleNamespace,
 ) -> str:
     pages = [rows[start : start + CARDS_PER_PAGE] for start in range(0, len(rows), CARDS_PER_PAGE)]
@@ -342,16 +343,19 @@ def prepare_assets(source_dir: Path, assets_dir: Path) -> dict[str, Path]:
 def prepare_qr_assets(
     rows: list[dict[str, str]],
     assets_dir: Path,
-    default_qr_text: str,
+    default_qr_text: str | None,
     show_qr: bool,
-) -> list[Path]:
+) -> list[Path | None]:
     if not show_qr:
         return []
 
     use_row_text = any("QR-Text" in row for row in rows)
-    qr_paths = []
+    qr_paths: list[Path | None] = []
     for index, row in enumerate(rows, start=1):
         text = row.get("QR-Text", "") if use_row_text else default_qr_text
+        if not text:
+            qr_paths.append(None)
+            continue
         qr_path = assets_dir / f"qr-{index:04d}.svg"
         make_qr_svg(text, qr_path)
         qr_paths.append(qr_path)
@@ -382,8 +386,8 @@ def generate(
     output: Path = typer.Option(Path("namensschilder.pdf"), "--output", "-o", help="Ziel-PDF"),
     fo: Path | None = typer.Option(None, "--fo", help="zusätzlich erzeugte XSL-FO-Datei behalten"),
     fop: str = typer.Option("fop", "--fop", help="FOP-Kommando oder Pfad (Standard: fop)"),
-    qr_text: str = typer.Option(
-        "Gastzugang WLAN",
+    qr_text: str | None = typer.Option(
+        None,
         "--qr-text",
         help="Fallback-Text für den QR-Code ohne QR-Text-Spalte",
     ),

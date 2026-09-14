@@ -265,7 +265,7 @@ def badge_xml(
     name_area = f"""
         <fo:block-container position="absolute" left="{CARD_MARGIN_MM}mm" bottom="{NAME_AREA_BOTTOM_MM}mm" width="62mm" height="{NAME_AREA_HEIGHT_MM}mm" overflow="hidden" display-align="after">
           {heading}
-          <fo:block font-family="Fira Sans" font-size="{name_size}" font-weight="bold" color="{BLUE}" line-height="1.05" space-after="1.1mm">{xml(name)}</fo:block>
+          <fo:block font-family="Fira Sans" font-size="{name_size}" font-weight="bold" color="{BLUE}" line-height="1.05" space-before="1mm" space-after="1.1mm">{xml(name)}</fo:block>
           <fo:block font-size="0pt" line-height="1.2mm" space-after="1.8mm"><fo:external-graphic src="url('{file_url(assets['rounded_line'])}')" content-width="25mm" content-height="1.2mm" scaling="non-uniform"/></fo:block>
           <fo:block font-family="Fira Sans" font-size="8.5pt" font-weight="bold" color="#000000" line-height="1.05">{xml(company)}</fo:block>
         </fo:block-container>"""
